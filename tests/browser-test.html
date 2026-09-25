@@ -1,0 +1,70 @@
+<!DOCTYPE html><meta charset="utf-8"><body>
+<iframe id="f" src="/index.html" style="width:420px;height:900px"></iframe>
+<script>
+const out=[]; const errors=[];
+const log=(ok,name,detail='')=>out.push((ok?'PASS ':'FAIL ')+name+(detail?'  ['+detail+']':''));
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const near=(a,b,t=1)=>Math.abs(a-b)<=t;
+async function run(){
+  const f=document.getElementById('f'), w=f.contentWindow, d=f.contentDocument, E=s=>w.eval(s);
+  const click=sel=>d.querySelector(sel).click();
+  log(errors.length===0,'no script errors on load',errors.join('; '));
+  // init state
+  log(d.getElementById('carrier').value==='136'&&d.getElementById('beatFreq').value==='0.5','Rest preset applied on load');
+  log(!d.querySelector('.session-card.wave-active'),'session cards never get wave-active');
+  log(d.querySelector('.abtn[data-beat="0.5"]').classList.contains('wave-active'),'Delta button highlighted');
+  // start
+  click('#beginBtn'); await sleep(1500);
+  log(E('running')&&E('graph')!==null,'session starts');
+  log(E('audioCtx.state')==='running','audio context running',E('audioCtx.state'));
+  log(E('graph.noise!==null')&&E('noiseType')==='brown','brown noise playing');
+  // signal on analyser
+  const sig=E('(()=>{const b=new Uint8Array(2048);graph.analyser.getByteTimeDomainData(b);let m=0;for(const v of b)m=Math.max(m,Math.abs(v-128));return m})()');
+  log(sig>2,'audio signal reaches analyser','peak '+sig);
+  // carrier change retunes everything, incl. sub
+  click('.freq-btn[data-hz="432"]'); await sleep(500);
+  const fr=E('[graph.binL.osc.frequency.value,graph.binR.osc.frequency.value,graph.sub.osc.frequency.value,graph.harm[0].osc.frequency.value]');
+  log(near(fr[0],432)&&near(fr[1],432.5)&&near(fr[2],216)&&near(fr[3],1296),'carrier 432 retunes binaural, sub and harmonics',fr.map(x=>x.toFixed(1)).join(','));
+  // beat button
+  click('.abtn[data-beat="10"]'); await sleep(500);
+  log(near(E('graph.binR.osc.frequency.value'),442),'alpha button sets beat 10 Hz');
+  log(!d.querySelector('.session-card.wave-active'),'beat button leaves session cards alone');
+  // noise swap
+  const before=E('graph.noise.src'); click('.noise-btn[data-noise="white"]'); await sleep(300);
+  log(E('noiseType')==='white'&&E('graph.noise.src')!==before,'noise swaps to white');
+  click('.noise-btn[data-noise="off"]'); await sleep(300);
+  log(E('graph.noise')===null,'noise off');
+  // session switch while running
+  click('.session-card[data-id="drift"]'); await sleep(500);
+  log(near(E('graph.binL.osc.frequency.value'),369)&&E('noiseType')==='pink'&&E('graph.noise!==null'),'switching to Drift while running retunes and restarts pink noise');
+  // stop then restart within the fade: new session must survive
+  click('#beginBtn'); await sleep(400); click('#beginBtn'); await sleep(3500);
+  log(E('running')&&E('graph')!==null&&E('audioCtx.state')==='running','restart during fade-out survives old cleanup',E('audioCtx&&audioCtx.state'));
+  // double click: only one engine
+  click('#beginBtn'); await sleep(2500);
+  click('#beginBtn'); click('#beginBtn'); await sleep(1500);
+  log(E('running')&&E('audioCtx')!==null,'double-tap BEGIN leaves one running session');
+  // advanced view canvas size
+  click('#toAdvanced'); await sleep(300);
+  const cv=d.getElementById('vis').getBoundingClientRect();
+  log(near(cv.height,90)&&cv.width>300,'waveform canvas sized by CSS',Math.round(cv.width)+'x'+Math.round(cv.height));
+  click('#toSimple');
+  click('#beginBtn'); await sleep(2500);
+  log(!E('running')&&E('graph')===null,'stop cleans up');
+  // PWA pieces
+  const regs=await w.navigator.serviceWorker.getRegistrations();
+  log(regs.length===1,'service worker registered',regs.map(r=>r.active&&r.active.scriptURL).join());
+  const man=await (await fetch('/manifest.webmanifest')).json();
+  const icons=await Promise.all(man.icons.map(i=>fetch('/'+i.src).then(r=>r.ok)));
+  log(icons.every(Boolean)&&man.display==='standalone','manifest and all icons load');
+  const cache=await w.caches.keys();
+  log(cache.includes('sonematic-v4'),'offline cache filled',cache.join());
+  log(errors.length===0,'no script errors during run',errors.join('; '));
+}
+window.addEventListener('load',()=>{
+  const w=document.getElementById('f').contentWindow;
+  w.addEventListener('error',e=>errors.push(e.message));
+  w.addEventListener('unhandledrejection',e=>errors.push('rejection: '+e.reason));
+  setTimeout(()=>run().catch(e=>out.push('HARNESS ERROR '+e+' '+e.stack)).finally(()=>fetch('/result',{method:'POST',body:out.join('\n')})),800);
+});
+</script>

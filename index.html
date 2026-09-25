@@ -1,14 +1,17 @@
 <!DOCTYPE html>
-<!-- saved from url=(0052)file:///C:/Users/Rick/Downloads/sonematic%20(3).html -->
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<html lang="en"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="description" content="Sonematic: a binaural beat and noise engine for rest, focus and flow.">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Sonematic">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#0c0a08">
 <title>Sonematic</title>
-<link id="pwa-manifest" rel="manifest" href="blob:null/32654894-ce50-41e9-9b2d-2a9cdf0c4408">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <style>
 /* ── reset ── */
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
@@ -337,7 +340,7 @@ body {
 }
 
 /* advanced controls — cold blue palette (inherited from original) */
-.adv canvas {
+#vis {
   width:100%; height:90px;
   background:#0a0a12;
   border:1px solid rgba(255,255,255,0.05);
@@ -403,6 +406,7 @@ input[type=range].warm-slider::-webkit-slider-thumb {
 }
 input[type=range]::-moz-range-track { height:2px; background:rgba(255,255,255,0.1); }
 input[type=range]::-moz-range-thumb { width:22px; height:22px; border-radius:50%; background:rgba(100,160,255,0.85); border:none; }
+input[type=range].warm-slider::-moz-range-thumb { background: var(--warm); box-shadow: 0 0 8px rgba(200,149,74,0.4); }
 
 @media (max-width:480px) {
   .a-panel { grid-template-columns:1fr; }
@@ -418,7 +422,7 @@ input[type=range]::-moz-range-thumb { width:22px; height:22px; border-radius:50%
   <div class="wordmark-sub">neural entrainment engine</div>
 
   <div class="sessions">
-    <div class="session-card active wave-active" data-id="rest" data-carrier="136" data-beat="0.5" data-noise="brown" data-noise-gain="55" data-harm="20" data-sub="25" data-vol="55">
+    <div class="session-card active" data-id="rest" data-carrier="136" data-beat="0.5" data-noise="brown" data-noise-gain="55" data-harm="20" data-sub="25" data-vol="55">
       <div class="s-glyph">◑</div>
       <div class="s-name">Rest</div>
       <div class="s-desc">sleep onset · delta wave · deep brown carrier</div>
@@ -557,58 +561,39 @@ input[type=range]::-moz-range-thumb { width:22px; height:22px; border-radius:50%
   <div class="adv-footer">
     carrier · harmonics 3× 6× 9× · binaural offset<br>
     stochastic resonance · sub-octave AM modulation<br>
-    sonematic engine · v0.3
+    sonematic engine · v0.4
   </div>
 </div>
 
 <script>
-/* ── PWA manifest ─────────────────────────────────────────────────────── */
-(function(){
-  const m={name:'Sonematic',short_name:'Sonematic',
-    description:'Neural entrainment engine',
-    start_url:'.',display:'standalone',
-    background_color:'#0c0a08',theme_color:'#0c0a08',orientation:'portrait',
-    icons:[{src:"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect width='192' height='192' fill='%230c0a08'/%3E%3Ccircle cx='96' cy='96' r='58' fill='none' stroke='%23c8954a' stroke-width='2'/%3E%3Ccircle cx='96' cy='96' r='28' fill='none' stroke='rgba(200,149,74,0.4)' stroke-width='1'/%3E%3C/svg%3E",sizes:'192x192',type:'image/svg+xml'}]};
-  const b=new Blob([JSON.stringify(m)],{type:'application/json'});
-  document.getElementById('pwa-manifest').href=URL.createObjectURL(b);
-})();
-
-/* ── Service worker ───────────────────────────────────────────────────── */
-if('serviceWorker' in navigator){
-  const src=`const C='sonematic-v3';
-    self.addEventListener('install',e=>{e.waitUntil(caches.open(C).then(c=>c.addAll(['.'])));self.skipWaiting();});
-    self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==C).map(k=>caches.delete(k)))));self.clients.claim();});
-    self.addEventListener('fetch',e=>{e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request)));});`;
-  navigator.serviceWorker.register(URL.createObjectURL(new Blob([src],{type:'application/javascript'}))).catch(()=>{});
+/* ── Offline / install (PWA) ──────────────────────────────────────────── */
+// Service workers only run over http(s). Opened as a local file, the page still
+// works, just without offline caching.
+if('serviceWorker' in navigator && /^https?:$/.test(location.protocol)){
+  window.addEventListener('load',()=>{navigator.serviceWorker.register('sw.js').catch(()=>{});});
 }
 
-/* ── AudioWorklet ─────────────────────────────────────────────────────── */
-const WL=`class PinkNoiseProcessor extends AudioWorkletProcessor{
-  constructor(){super();this._b=new Float32Array(7);}
-  process(inputs,outputs){const o=outputs[0][0],b=this._b;
-    for(let i=0;i<o.length;i++){const w=Math.random()*2-1;
-      b[0]=0.99886*b[0]+w*0.0555179;b[1]=0.99332*b[1]+w*0.0750759;
-      b[2]=0.96900*b[2]+w*0.1538520;b[3]=0.86650*b[3]+w*0.3104856;
-      b[4]=0.55000*b[4]+w*0.5329522;b[5]=-0.7616*b[5]-w*0.0168980;
-      o[i]=(b[0]+b[1]+b[2]+b[3]+b[4]+b[5]+b[6]+w*0.5362)*0.11;b[6]=w*0.115926;}
-    return true;}}
-registerProcessor('pink-noise',PinkNoiseProcessor);`;
-function wlURL(){return URL.createObjectURL(new Blob([WL],{type:'application/javascript'}));}
+/* ── Constants ────────────────────────────────────────────────────────── */
+const HARMONICS=[3,6,9];
+const FADE_IN=3, FADE_OUT=2;   // seconds
+const RAMP=0.05;               // time constant for live parameter changes
+const NOISE_SECONDS=8;         // length of each looped noise buffer
 
 /* ── State ────────────────────────────────────────────────────────────── */
-var running = false;
-var currentSession = 'rest';
-let audioCtx, binL, binR, masterGain, analyser, merger;
-let pinkNode, noiseGainL, noiseGainR;
-let harmOscs=[], subOsc, subGain, animId;
+let running=false;
+let busy=false;                // true while a session is starting
 let noiseType='brown';
+let audioCtx=null;             // context of the running session
+let graph=null;                // nodes of the running session
+let noiseBuffers={};           // noise generated for the running context
+let analyserBuf=null, animId=0;
 let wakeLock=null;
-let timerInterval=null;
-let timerSeconds=0;
-let fadeGain=null;
+let timerInterval=null, timerSeconds=0;
+
+const $=id=>document.getElementById(id);
 
 /* ── Canvas ───────────────────────────────────────────────────────────── */
-const canvas=document.getElementById('vis');
+const canvas=$('vis');
 const vCtx=canvas.getContext('2d');
 
 function resizeCanvas(){
@@ -616,171 +601,175 @@ function resizeCanvas(){
   if(r.width===0)return;
   canvas.width=Math.round(r.width*dpr);
   canvas.height=Math.round(r.height*dpr);
-  vCtx.scale(dpr,dpr);
+  vCtx.setTransform(dpr,0,0,dpr,0,0);
   if(!running)clearCanvas();
 }
 new ResizeObserver(resizeCanvas).observe(canvas);
-resizeCanvas();
 function cW(){return canvas.getBoundingClientRect().width;}
 function cH(){return canvas.getBoundingClientRect().height;}
 
 /* ── WakeLock ─────────────────────────────────────────────────────────── */
 async function acquireWakeLock(){
-  if(!('wakeLock' in navigator))return;
-  try{wakeLock=await navigator.wakeLock.request('screen');
-    document.getElementById('wakeLockStatus').textContent='· screen lock active ·';
-    wakeLock.addEventListener('release',()=>{document.getElementById('wakeLockStatus').textContent='';});}
-  catch(_){}
+  if(!('wakeLock' in navigator)||wakeLock)return;
+  try{
+    wakeLock=await navigator.wakeLock.request('screen');
+    $('wakeLockStatus').textContent='· screen lock active ·';
+    wakeLock.addEventListener('release',()=>{wakeLock=null;$('wakeLockStatus').textContent='';});
+  }catch(_){}
 }
 function releaseWakeLock(){
   if(wakeLock){wakeLock.release();wakeLock=null;}
-  document.getElementById('wakeLockStatus').textContent='';
+  $('wakeLockStatus').textContent='';
 }
 document.addEventListener('visibilitychange',()=>{
-  if(running&&document.visibilityState==='visible')acquireWakeLock();
+  if(!running||document.visibilityState!=='visible')return;
+  acquireWakeLock();
+  // iOS suspends the context on interruptions (calls, lock screen)
+  if(audioCtx&&audioCtx.state!=='running')audioCtx.resume().catch(()=>{});
 });
 
 /* ── Params ───────────────────────────────────────────────────────────── */
 function getParams(){
+  const v=id=>parseFloat($(id).value);
   return{
-    carrier:parseFloat(document.getElementById('carrier').value),
-    beat:parseFloat(document.getElementById('beatFreq').value),
-    noise:parseFloat(document.getElementById('noiseGain').value)/100,
-    harm:parseFloat(document.getElementById('harmGain').value)/100,
-    vol:parseFloat(document.getElementById('masterVol').value)/100,
-    sub:0.05+(parseFloat(document.getElementById('subDepth').value)/100)*0.75,
+    carrier:v('carrier'),
+    beat:v('beatFreq'),
+    noise:v('noiseGain')/100,
+    harm:v('harmGain')/100,
+    vol:v('masterVol')/100,
+    sub:0.05+(v('subDepth')/100)*0.75,
   };
 }
 
-/* ── Noise generators ─────────────────────────────────────────────────── */
-function mkPinkSP(actx){
-  const b=new Float32Array(7),n=actx.createScriptProcessor(4096,1,1);
-  n.onaudioprocess=e=>{const o=e.outputBuffer.getChannelData(0);
-    for(let i=0;i<4096;i++){const w=Math.random()*2-1;
+/* ── Noise ────────────────────────────────────────────────────────────── */
+// Noise is generated once per context into a buffer and looped, so it runs on
+// the audio thread rather than the page's main thread. The loop seam is
+// crossfaded so brown noise, which drifts, does not click when it wraps.
+function makeNoiseBuffer(actx,type){
+  const sr=actx.sampleRate, len=Math.floor(sr*NOISE_SECONDS), fade=Math.floor(sr*0.5);
+  const x=new Float32Array(len+fade);
+  if(type==='white'){
+    for(let i=0;i<x.length;i++)x[i]=(Math.random()*2-1)*0.5;
+  }else if(type==='pink'){
+    const b=new Float32Array(7);
+    for(let i=0;i<x.length;i++){const w=Math.random()*2-1;
       b[0]=0.99886*b[0]+w*0.0555179;b[1]=0.99332*b[1]+w*0.0750759;
       b[2]=0.96900*b[2]+w*0.1538520;b[3]=0.86650*b[3]+w*0.3104856;
       b[4]=0.55000*b[4]+w*0.5329522;b[5]=-0.7616*b[5]-w*0.0168980;
-      o[i]=(b[0]+b[1]+b[2]+b[3]+b[4]+b[5]+b[6]+w*0.5362)*0.11;b[6]=w*0.115926;}};
-  return n;
+      x[i]=(b[0]+b[1]+b[2]+b[3]+b[4]+b[5]+b[6]+w*0.5362)*0.11;b[6]=w*0.115926;}
+  }else{ // brown
+    let last=0;
+    for(let i=0;i<x.length;i++){const w=Math.random()*2-1;last=(last+0.02*w)/1.02;x[i]=last*3.5;}
+  }
+  const buf=actx.createBuffer(1,len,sr), out=buf.getChannelData(0);
+  for(let i=0;i<len;i++){
+    if(i<fade){const t=i/fade*Math.PI/2;out[i]=x[i]*Math.sin(t)+x[i+len]*Math.cos(t);}
+    else out[i]=x[i];
+  }
+  return buf;
 }
-function mkWhite(actx){
-  const n=actx.createScriptProcessor(4096,1,1);
-  n.onaudioprocess=e=>{const o=e.outputBuffer.getChannelData(0);for(let i=0;i<4096;i++)o[i]=(Math.random()*2-1)*0.5;};
-  return n;
-}
-function mkBrown(actx){
-  let last=0;const n=actx.createScriptProcessor(4096,1,1);
-  n.onaudioprocess=e=>{const o=e.outputBuffer.getChannelData(0);
-    for(let i=0;i<4096;i++){const w=Math.random()*2-1;last=(last+0.02*w)/1.02;o[i]=last*3.5;}};
-  return n;
-}
-async function createNoiseNode(actx,type){
-  if(type==='off')return null;
-  if(type==='white')return mkWhite(actx);
-  if(type==='brown')return mkBrown(actx);
-  try{const u=wlURL();await actx.audioWorklet.addModule(u);URL.revokeObjectURL(u);return new AudioWorkletNode(actx,'pink-noise');}
-  catch(_){return mkPinkSP(actx);}
-}
-function swapNoiseNode(type){
-  if(!audioCtx||!running){noiseType=type;return;}
+function swapNoise(type){
   noiseType=type;
-  try{pinkNode&&pinkNode.disconnect();}catch(_){}
-  noiseGainL.gain.value=noiseGainR.gain.value=0;
-  if(type==='off'){pinkNode=null;return;}
-  const n=type==='white'?mkWhite(audioCtx):type==='brown'?mkBrown(audioCtx):mkPinkSP(audioCtx);
-  n.connect(noiseGainL);n.connect(noiseGainR);pinkNode=n;
-  const p=getParams();noiseGainL.gain.value=noiseGainR.gain.value=p.noise;
+  if(!graph)return;
+  const g=graph, actx=audioCtx, now=actx.currentTime, old=g.noise;
+  if(old){
+    old.fade.gain.setTargetAtTime(0,now,RAMP);
+    old.src.stop(now+0.4);
+  }
+  g.noise=null;
+  if(type==='off')return;
+  noiseBuffers[type]=noiseBuffers[type]||makeNoiseBuffer(actx,type);
+  const src=actx.createBufferSource(), fade=actx.createGain();
+  src.buffer=noiseBuffers[type]; src.loop=true;
+  fade.gain.setValueAtTime(0,now); fade.gain.setTargetAtTime(1,now,RAMP);
+  src.connect(fade); fade.connect(g.noiseGain); src.start();
+  g.noise={src,fade};
 }
 
 /* ── Start ────────────────────────────────────────────────────────────── */
 async function start(){
-  audioCtx=new(window.AudioContext||window.webkitAudioContext)();
-  const p=getParams();
+  const actx=new(window.AudioContext||window.webkitAudioContext)();
+  if(actx.state!=='running')await actx.resume().catch(()=>{});
+  const p=getParams(), now=actx.currentTime;
+  const g={};
 
-  fadeGain=audioCtx.createGain(); fadeGain.gain.setValueAtTime(0,audioCtx.currentTime);
-  fadeGain.gain.linearRampToValueAtTime(1,audioCtx.currentTime+3); // 3s fade in
-  masterGain=audioCtx.createGain(); masterGain.gain.value=p.vol*0.4;
-  fadeGain.connect(masterGain); masterGain.connect(audioCtx.destination);
-  analyser=audioCtx.createAnalyser(); analyser.fftSize=2048;
-  masterGain.connect(analyser);
-  merger=audioCtx.createChannelMerger(2); merger.connect(fadeGain);
+  g.fade=actx.createGain();
+  g.fade.gain.setValueAtTime(0,now); g.fade.gain.linearRampToValueAtTime(1,now+FADE_IN);
+  g.master=actx.createGain(); g.master.gain.value=p.vol*0.4;
+  g.analyser=actx.createAnalyser(); g.analyser.fftSize=2048;
+  g.merger=actx.createChannelMerger(2);
+  g.merger.connect(g.fade); g.fade.connect(g.master);
+  g.master.connect(actx.destination); g.master.connect(g.analyser);
 
-  noiseGainL=audioCtx.createGain(); noiseGainR=audioCtx.createGain();
-  noiseGainL.gain.value=noiseGainR.gain.value=p.noise;
-  pinkNode=await createNoiseNode(audioCtx,noiseType);
-  if(pinkNode){pinkNode.connect(noiseGainL);pinkNode.connect(noiseGainR);}
-  noiseGainL.connect(merger,0,0); noiseGainR.connect(merger,0,1);
+  // noise: the same signal in both ears
+  g.noiseGain=actx.createGain(); g.noiseGain.gain.value=p.noise;
+  g.noiseGain.connect(g.merger,0,0); g.noiseGain.connect(g.merger,0,1);
 
-  binL=audioCtx.createOscillator(); binR=audioCtx.createOscillator();
-  binL.type=binR.type='sine';
-  binL.frequency.value=p.carrier; binR.frequency.value=p.carrier+p.beat;
-  const bgL=audioCtx.createGain(); bgL.gain.value=0.25;
-  const bgR=audioCtx.createGain(); bgR.gain.value=0.25;
-  binL.connect(bgL);bgL.connect(merger,0,0);
-  binR.connect(bgR);bgR.connect(merger,0,1);
-  binL.start();binR.start();
+  const tone=(freq,level,...chans)=>{
+    const osc=actx.createOscillator(), gain=actx.createGain();
+    osc.type='sine'; osc.frequency.value=freq; gain.gain.value=level;
+    osc.connect(gain); chans.forEach(c=>gain.connect(g.merger,0,c));
+    osc.start();
+    return{osc,gain};
+  };
+  // binaural pair: carrier in the left ear, carrier + beat in the right
+  g.binL=tone(p.carrier,0.25,0);
+  g.binR=tone(p.carrier+p.beat,0.25,1);
+  g.harm=HARMONICS.map((m,i)=>tone(p.carrier*m,p.harm*(0.15/(i+1)),0,1));
+  g.sub=tone(p.carrier*0.5,p.sub,0,1);
 
-  harmOscs=[];
-  [3,6,9].forEach((m,i)=>{
-    const osc=audioCtx.createOscillator(),g=audioCtx.createGain();
-    osc.type='sine'; osc.frequency.value=p.carrier*m;
-    g.gain.value=p.harm*(0.15/(i+1));
-    osc.connect(g);g.connect(merger,0,0);g.connect(merger,0,1);
-    osc.start(); harmOscs.push({osc,gain:g});
-  });
-
-  subOsc=audioCtx.createOscillator(); subGain=audioCtx.createGain();
-  subOsc.type='sine'; subOsc.frequency.value=p.carrier*0.5;
-  subGain.gain.value=p.sub;
-  subOsc.connect(subGain);subGain.connect(merger,0,0);subGain.connect(merger,0,1);
-  subOsc.start();
+  audioCtx=actx; graph=g; noiseBuffers={};
+  analyserBuf=new Uint8Array(g.analyser.fftSize);
+  swapNoise(noiseType);
 
   acquireWakeLock();
   startTimer();
+  cancelAnimationFrame(animId);
   animate();
 }
 
 /* ── Stop ─────────────────────────────────────────────────────────────── */
 function stop(){
-  if(!audioCtx)return;
-  // fade out over 2s
-  const now=audioCtx.currentTime;
-  fadeGain.gain.setValueAtTime(fadeGain.gain.value,now);
-  fadeGain.gain.linearRampToValueAtTime(0,now+2);
-  setTimeout(()=>{
-    const ss=n=>{try{n.stop();}catch(_){}};
-    const sd=n=>{try{n.disconnect();}catch(_){}};
-    ss(binL);ss(binR);sd(binL);sd(binR);
-    harmOscs.forEach(({osc,gain})=>{ss(osc);sd(osc);sd(gain);}); harmOscs=[];
-    ss(subOsc);sd(subOsc);sd(subGain);
-    sd(pinkNode);sd(noiseGainL);sd(noiseGainR);sd(masterGain);sd(fadeGain);
-    audioCtx.close(); audioCtx=null;
-    cancelAnimationFrame(animId);
-    clearCanvas();
-  },2100);
+  // Fade and close this session's own context: a new session may start before
+  // the fade finishes, and it must not be touched.
+  const actx=audioCtx, g=graph;
+  audioCtx=null; graph=null; noiseBuffers={};
+  if(actx&&g){
+    const now=actx.currentTime;
+    g.fade.gain.cancelScheduledValues(now);
+    g.fade.gain.setValueAtTime(g.fade.gain.value,now);
+    g.fade.gain.linearRampToValueAtTime(0,now+FADE_OUT);
+    setTimeout(()=>{actx.close().catch(()=>{});},FADE_OUT*1000+100);
+  }
+  cancelAnimationFrame(animId);
+  clearCanvas();
   releaseWakeLock();
   stopTimer();
 }
 
 /* ── Live update ──────────────────────────────────────────────────────── */
 function updateParams(){
-  if(!audioCtx||!running)return;
-  const p=getParams();
-  masterGain.gain.value=p.vol*0.4;
-  binL.frequency.value=p.carrier; binR.frequency.value=p.carrier+p.beat;
-  noiseGainL.gain.value=noiseGainR.gain.value=p.noise;
-  subGain.gain.value=p.sub;
-  harmOscs.forEach(({osc,gain},i)=>{
-    osc.frequency.value=p.carrier*[3,6,9][i];
-    gain.gain.value=p.harm*(0.15/(i+1));
+  if(!graph)return;
+  const p=getParams(), g=graph, now=audioCtx.currentTime;
+  const set=(param,v)=>param.setTargetAtTime(v,now,RAMP);
+  set(g.master.gain,p.vol*0.4);
+  set(g.binL.osc.frequency,p.carrier);
+  set(g.binR.osc.frequency,p.carrier+p.beat);
+  set(g.noiseGain.gain,p.noise);
+  set(g.sub.osc.frequency,p.carrier*0.5);
+  set(g.sub.gain.gain,p.sub);
+  g.harm.forEach(({osc,gain},i)=>{
+    set(osc.frequency,p.carrier*HARMONICS[i]);
+    set(gain.gain,p.harm*(0.15/(i+1)));
   });
 }
 
 /* ── Timer ────────────────────────────────────────────────────────────── */
 function startTimer(){
+  clearInterval(timerInterval);
   timerSeconds=0;
-  const disp=document.getElementById('timerDisplay');
-  const lbl=document.getElementById('timerLabel');
+  const disp=$('timerDisplay'), lbl=$('timerLabel');
+  disp.textContent='00:00';
   disp.classList.add('visible'); lbl.classList.add('visible');
   timerInterval=setInterval(()=>{
     timerSeconds++;
@@ -790,10 +779,11 @@ function startTimer(){
   },1000);
 }
 function stopTimer(){
-  clearInterval(timerInterval);
-  const disp=document.getElementById('timerDisplay');
-  const lbl=document.getElementById('timerLabel');
-  setTimeout(()=>{disp.classList.remove('visible');lbl.classList.remove('visible');},1000);
+  clearInterval(timerInterval); timerInterval=null;
+  setTimeout(()=>{
+    if(running)return; // a new session started meanwhile
+    $('timerDisplay').classList.remove('visible'); $('timerLabel').classList.remove('visible');
+  },1000);
 }
 
 /* ── Draw ─────────────────────────────────────────────────────────────── */
@@ -802,10 +792,9 @@ function clearCanvas(){
 }
 function animate(){
   animId=requestAnimationFrame(animate);
-  if(!analyser)return;
-  const w=cW(),h=cH();
-  const buf=new Uint8Array(analyser.frequencyBinCount);
-  analyser.getByteTimeDomainData(buf);
+  if(!graph||!$('view-advanced').classList.contains('visible'))return;
+  const w=cW(),h=cH(),buf=analyserBuf;
+  graph.analyser.getByteTimeDomainData(buf);
   vCtx.fillStyle='rgba(10,10,18,0.35)'; vCtx.fillRect(0,0,w,h);
   vCtx.beginPath();
   const step=w/buf.length;
@@ -823,111 +812,7 @@ function animate(){
   vCtx.strokeStyle='rgba(255,255,255,0.04)'; vCtx.lineWidth=1; vCtx.stroke();
 }
 
-/* ── Apply session preset to controls ────────────────────────────────── */
-function applySession(card){
-  const c=card.dataset;
-  // carrier
-  document.getElementById('carrier').value=c.carrier;
-  updateSliderDisplay('carrier','carrierVal','Hz');
-  // beat
-  document.getElementById('beatFreq').value=c.beat;
-  updateSliderDisplay('beatFreq','beatVal','Hz');
-  // noise gain
-  document.getElementById('noiseGain').value=c.noiseGain;
-  updateSliderDisplay('noiseGain','noiseVal','%');
-  // harm
-  document.getElementById('harmGain').value=c.harm;
-  updateSliderDisplay('harmGain','harmVal','%');
-  // vol
-  document.getElementById('masterVol').value=c.vol;
-  updateSliderDisplay('masterVol','volVal','%');
-  document.getElementById('simpleVol').value=c.vol;
-  document.getElementById('simpleVolVal').textContent=c.vol+'%';
-  // sub
-  document.getElementById('subDepth').value=c.sub;
-  updateSliderDisplay('subDepth','subVal','%');
-
-  // noise type buttons
-  noiseType=c.noise;
-  document.querySelectorAll('.noise-btn').forEach(b=>{
-    b.classList.toggle('noise-active', b.dataset.noise===c.noise);
-  });
-
-  // carrier freq buttons
-  document.querySelectorAll('.freq-btn').forEach(b=>{
-    b.classList.toggle('active', parseInt(b.dataset.hz)===parseInt(c.carrier));
-  });
-
-  // beat buttons
-  document.querySelectorAll('[data-beat]').forEach(b=>{
-    const bv=parseFloat(b.dataset.beat), cv=parseFloat(c.beat);
-    b.classList.toggle('wave-active', bv===cv||(bv===0.5&&cv<1));
-  });
-
-  // sync noise if running
-  if(running&&audioCtx) swapNoiseNode(c.noise);
-  if(running) updateParams();
-
-  // advanced sync note
-  document.getElementById('advSyncNote').textContent=
-    running ? '· synced to '+card.querySelector('.s-name').textContent.toLowerCase() : '';
-}
-
-function updateSliderDisplay(id,valId,unit){
-  const v=parseFloat(document.getElementById(id).value);
-  const d=v%1===0?v:v.toFixed(1);
-  document.getElementById(valId).innerHTML=`${d} <span class="unit">${unit}</span>`;
-}
-
-/* ── Session card clicks ──────────────────────────────────────────────── */
-document.querySelectorAll('.session-card').forEach(card=>{
-  card.addEventListener('click',()=>{
-    document.querySelectorAll('.session-card').forEach(c=>c.classList.remove('active'));
-    card.classList.add('active');
-    currentSession=card.dataset.id;
-    applySession(card);
-  });
-});
-
-/* ── Begin button ─────────────────────────────────────────────────────── */
-document.getElementById('beginBtn').addEventListener('click', async()=>{
-  running=!running;
-  const wrap=document.getElementById('beginWrap');
-  const btn=document.getElementById('beginBtn');
-  const bstate=document.getElementById('bState');
-  if(running){
-    wrap.classList.add('running');
-    btn.innerHTML='END<span class="b-state" id="bState">session active</span>';
-    await start();
-  } else {
-    wrap.classList.remove('running');
-    btn.innerHTML='BEGIN<span class="b-state" id="bState">select a session</span>';
-    stop();
-    document.getElementById('advSyncNote').textContent='';
-  }
-});
-
-/* ── Simple volume ────────────────────────────────────────────────────── */
-document.getElementById('simpleVol').addEventListener('input',function(){
-  const v=parseInt(this.value);
-  document.getElementById('simpleVolVal').textContent=v+'%';
-  document.getElementById('masterVol').value=v;
-  updateSliderDisplay('masterVol','volVal','%');
-  updateParams();
-});
-
-/* ── View toggle ──────────────────────────────────────────────────────── */
-document.getElementById('toAdvanced').addEventListener('click',()=>{
-  document.getElementById('view-simple').style.display='none';
-  document.getElementById('view-advanced').classList.add('visible');
-  setTimeout(resizeCanvas,50);
-});
-document.getElementById('toSimple').addEventListener('click',()=>{
-  document.getElementById('view-simple').style.display='flex';
-  document.getElementById('view-advanced').classList.remove('visible');
-});
-
-/* ── Advanced slider controls ─────────────────────────────────────────── */
+/* ── Controls ─────────────────────────────────────────────────────────── */
 const sliderMeta={
   carrier:{valId:'carrierVal',unit:'Hz'},
   beatFreq:{valId:'beatVal',unit:'Hz'},
@@ -936,52 +821,124 @@ const sliderMeta={
   masterVol:{valId:'volVal',unit:'%'},
   subDepth:{valId:'subVal',unit:'%'},
 };
-Object.entries(sliderMeta).forEach(([id,{valId,unit}])=>{
-  document.getElementById(id).addEventListener('input',function(){
-    const v=parseFloat(this.value),d=v%1===0?v:v.toFixed(1);
-    document.getElementById(valId).innerHTML=`${d} <span class="unit">${unit}</span>`;
-    if(id==='carrier'){
-      const m=[...document.querySelectorAll('.freq-btn')].find(b=>parseInt(b.dataset.hz)===Math.round(v));
-      document.querySelectorAll('.freq-btn').forEach(b=>b.classList.remove('active'));
-      if(m)m.classList.add('active');
-    }
-    if(id==='masterVol'){
-      document.getElementById('simpleVol').value=this.value;
-      document.getElementById('simpleVolVal').textContent=Math.round(v)+'%';
-    }
+function updateSliderDisplay(id){
+  const {valId,unit}=sliderMeta[id], v=parseFloat($(id).value);
+  $(valId).innerHTML=`${v%1===0?v:v.toFixed(1)} <span class="unit">${unit}</span>`;
+}
+function setSlider(id,value){ $(id).value=value; updateSliderDisplay(id); }
+function setSimpleVol(v){ $('simpleVol').value=v; $('simpleVolVal').textContent=Math.round(v)+'%'; }
+function highlightCarrier(hz){
+  document.querySelectorAll('.freq-btn').forEach(b=>b.classList.toggle('active',parseInt(b.dataset.hz)===Math.round(hz)));
+}
+function highlightBeat(beat){
+  document.querySelectorAll('.abtn[data-beat]').forEach(b=>{
+    const bv=parseFloat(b.dataset.beat);
+    b.classList.toggle('wave-active',bv===beat||(bv===0.5&&beat<1));
+  });
+}
+function highlightNoise(type){
+  document.querySelectorAll('.noise-btn').forEach(b=>b.classList.toggle('noise-active',b.dataset.noise===type));
+}
+
+/* ── Apply session preset to controls ────────────────────────────────── */
+function applySession(card){
+  const c=card.dataset;
+  setSlider('carrier',c.carrier);
+  setSlider('beatFreq',c.beat);
+  setSlider('noiseGain',c.noiseGain);
+  setSlider('harmGain',c.harm);
+  setSlider('masterVol',c.vol);
+  setSlider('subDepth',c.sub);
+  setSimpleVol(c.vol);
+  highlightCarrier(parseFloat(c.carrier));
+  highlightBeat(parseFloat(c.beat));
+  highlightNoise(c.noise);
+
+  if(c.noise!==noiseType)swapNoise(c.noise);
+  updateParams();
+
+  $('advSyncNote').textContent=
+    running ? '· synced to '+card.querySelector('.s-name').textContent.toLowerCase() : '';
+}
+
+document.querySelectorAll('.session-card').forEach(card=>{
+  card.addEventListener('click',()=>{
+    document.querySelectorAll('.session-card').forEach(c=>c.classList.remove('active'));
+    card.classList.add('active');
+    applySession(card);
+  });
+});
+
+/* ── Begin button ─────────────────────────────────────────────────────── */
+$('beginBtn').addEventListener('click',async()=>{
+  if(busy)return;
+  running=!running;
+  $('beginWrap').classList.toggle('running',running);
+  $('beginBtn').innerHTML=running
+    ? 'END<span class="b-state" id="bState">session active</span>'
+    : 'BEGIN<span class="b-state" id="bState">select a session</span>';
+  if(running){
+    busy=true;
+    try{await start();}finally{busy=false;}
+  }else{
+    stop();
+    $('advSyncNote').textContent='';
+  }
+});
+
+/* ── Volume, sliders and buttons ──────────────────────────────────────── */
+$('simpleVol').addEventListener('input',function(){
+  setSimpleVol(this.value);
+  setSlider('masterVol',this.value);
+  updateParams();
+});
+
+Object.keys(sliderMeta).forEach(id=>{
+  $(id).addEventListener('input',function(){
+    updateSliderDisplay(id);
+    const v=parseFloat(this.value);
+    if(id==='carrier')highlightCarrier(v);
+    if(id==='beatFreq')highlightBeat(v);
+    if(id==='masterVol')setSimpleVol(v);
     updateParams();
   });
 });
 
-document.querySelectorAll('[data-beat]').forEach(btn=>{
+document.querySelectorAll('.abtn[data-beat]').forEach(btn=>{
   btn.addEventListener('click',()=>{
-    document.querySelectorAll('[data-beat]').forEach(b=>b.classList.remove('wave-active'));
-    btn.classList.add('wave-active');
-    const sl=document.getElementById('beatFreq');
+    const sl=$('beatFreq');
     sl.value=btn.dataset.beat; sl.dispatchEvent(new Event('input'));
   });
 });
 
 document.querySelectorAll('.noise-btn').forEach(btn=>{
   btn.addEventListener('click',()=>{
-    document.querySelectorAll('.noise-btn').forEach(b=>b.classList.remove('noise-active'));
-    btn.classList.add('noise-active');
-    swapNoiseNode(btn.dataset.noise);
+    highlightNoise(btn.dataset.noise);
+    swapNoise(btn.dataset.noise);
   });
 });
 
 document.querySelectorAll('.freq-btn').forEach(btn=>{
   btn.addEventListener('click',()=>{
-    document.querySelectorAll('.freq-btn').forEach(b=>b.classList.remove('active'));
-    btn.classList.add('active');
-    const sl=document.getElementById('carrier');
+    const sl=$('carrier');
     sl.value=btn.dataset.hz; sl.dispatchEvent(new Event('input'));
   });
 });
 
-/* ── Init: apply default session (Rest) ──────────────────────────────── */
-const defaultCard=document.querySelector('.session-card[data-id="rest"]');
-if(defaultCard) applySession(defaultCard);
+/* ── View toggle ──────────────────────────────────────────────────────── */
+$('toAdvanced').addEventListener('click',()=>{
+  $('view-simple').style.display='none';
+  $('view-advanced').classList.add('visible');
+  requestAnimationFrame(resizeCanvas);
+});
+$('toSimple').addEventListener('click',()=>{
+  $('view-simple').style.display='flex';
+  $('view-advanced').classList.remove('visible');
+});
+
+/* ── Init: apply the default session (Rest) ──────────────────────────── */
+applySession(document.querySelector('.session-card[data-id="rest"]'));
+resizeCanvas();
 clearCanvas();
 </script>
 
